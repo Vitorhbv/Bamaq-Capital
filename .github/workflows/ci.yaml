@@ -1,0 +1,31 @@
+name: Validate challenge
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build pinned image
+        run: docker compose build api
+      - name: Lint and format
+        run: |
+          docker compose run --rm --no-deps --entrypoint ruff api check --no-cache src tests migrations scripts
+          docker compose run --rm --no-deps --entrypoint ruff api format --check --no-cache src tests migrations scripts
+      - name: Run unit and real infrastructure tests
+        run: docker compose --profile test run --rm tests
+      - name: Start application and smoke test
+        run: |
+          docker compose up -d --no-build --wait
+          docker compose exec -T api python scripts/smoke.py
+          docker compose exec -T api alembic check
+      - name: Logs on failure
+        if: failure()
+        run: docker compose logs --tail=100
+      - name: Stop environment
+        if: always()
+        run: docker compose down

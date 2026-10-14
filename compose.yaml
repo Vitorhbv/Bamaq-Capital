@@ -1,0 +1,154 @@
+name: bamaq-capital
+
+x-app: &app
+  build: .
+  image: bamaq-capital:local
+  restart: unless-stopped
+  environment: &environment
+    BAMAQ_DATABASE_URL: mysql+pymysql://bamaq:bamaq@mysql:3306/bamaq?charset=utf8mb4
+    BAMAQ_KAFKA_BOOTSTRAP_SERVERS: kafka:9093
+    BAMAQ_RISK_URL: http://risk-mock:8000
+    BAMAQ_MAX_ATTEMPTS: ${BAMAQ_MAX_ATTEMPTS:-16}
+    BAMAQ_LEASE_SECONDS: ${BAMAQ_LEASE_SECONDS:-30}
+    BAMAQ_POLL_SECONDS: ${BAMAQ_POLL_SECONDS:-0.5}
+    BAMAQ_LOG_LEVEL: ${BAMAQ_LOG_LEVEL:-INFO}
+  depends_on:
+    migrate:
+      condition: service_completed_successfully
+    kafka-init:
+      condition: service_completed_successfully
+  stop_grace_period: 20s
+
+services:
+  mysql:
+    image: mysql:8.4.5
+    environment:
+      MYSQL_DATABASE: bamaq
+      MYSQL_USER: bamaq
+      MYSQL_PASSWORD: bamaq
+      MYSQL_ROOT_PASSWORD: local-root
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_0900_ai_ci"]
+    ports: ["127.0.0.1:3306:3306"]
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./docker/mysql-init.sql:/docker-entrypoint-initdb.d/01-test-database.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  kafka:
+    image: apache/kafka:4.1.2
+    hostname: kafka
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: INTERNAL://:9093,HOST://:9092,CONTROLLER://:9094
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9093,HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,HOST:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9094
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+    ports: ["127.0.0.1:9092:9092"]
+    volumes: ["kafka-data:/var/lib/kafka/data"]
+    healthcheck:
+      test: ["CMD", "/opt/kafka/bin/kafka-topics.sh", "--bootstrap-server", "kafka:9093", "--list"]
+      interval: 10s
+      timeout: 10s
+      retries: 20
+
+  kafka-init:
+    image: apache/kafka:4.1.2
+    restart: "no"
+    depends_on:
+      kafka:
+        condition: service_healthy
+    entrypoint: ["/bin/bash", "/init-topics.sh"]
+    volumes: ["./docker/init-topics.sh:/init-topics.sh:ro"]
+
+  migrate:
+    <<: *app
+    restart: "no"
+    entrypoint: ["alembic"]
+    command: ["upgrade", "head"]
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  api:
+    <<: *app
+    command: ["api"]
+    ports: ["127.0.0.1:8000:8000"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/ready', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  risk-mock:
+    <<: *app
+    command: ["risk-mock"]
+    depends_on: {}
+    environment:
+      <<: *environment
+      BAMAQ_MOCK_MODE: ${BAMAQ_MOCK_MODE:-normal}
+      BAMAQ_MOCK_DELAY_SECONDS: ${BAMAQ_MOCK_DELAY_SECONDS:-0}
+      BAMAQ_MOCK_FAIL_FIRST: ${BAMAQ_MOCK_FAIL_FIRST:-0}
+      BAMAQ_MOCK_APPROVAL_LIMIT: ${BAMAQ_MOCK_APPROVAL_LIMIT:-5000.00}
+    ports: ["127.0.0.1:8001:8000"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health/live', timeout=3)"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  relay:
+    <<: *app
+    command: ["relay"]
+    healthcheck:
+      test: ["CMD", "bamaq", "health", "relay"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  consumer:
+    <<: *app
+    command: ["consumer"]
+    healthcheck:
+      test: ["CMD", "bamaq", "health", "consumer"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  worker:
+    <<: *app
+    command: ["worker"]
+    healthcheck:
+      test: ["CMD", "bamaq", "health", "worker"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  tests:
+    <<: *app
+    profiles: ["test"]
+    restart: "no"
+    entrypoint: ["pytest"]
+    command: ["-q"]
+    environment:
+      <<: *environment
+      BAMAQ_TEST_DATABASE_URL: mysql+pymysql://bamaq:bamaq@mysql:3306/bamaq_test?charset=utf8mb4
+      BAMAQ_TEST_KAFKA_BOOTSTRAP_SERVERS: kafka:9093
+      PYTEST_ADDOPTS: -o cache_dir=/tmp/pytest-cache
+
+volumes:
+  mysql-data:
+  kafka-data:

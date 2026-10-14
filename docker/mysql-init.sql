@@ -1,0 +1,2 @@
+CREATE DATABASE IF NOT EXISTS bamaq_test CHARACTER SET utf8mb4;
+GRANT ALL PRIVILEGES ON bamaq_test.* TO 'bamaq'@'%';

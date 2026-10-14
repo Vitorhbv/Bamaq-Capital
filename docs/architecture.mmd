@@ -1,0 +1,16 @@
+flowchart TD
+    Client[Cliente] --> API[API FastAPI: POST e GET]
+    API -->|Transação + outbox: commit atômico| DB[(MySQL 8.4)]
+    DB -->|Eventos pendentes em ordem| Relay[Publicador outbox: uma réplica]
+    Relay -->|acks=all; produtor idempotente| Kafka[Kafka KRaft: chave transaction_id]
+    Kafka -->|transactions.commands.v1| Consumer[Consumer: commit manual]
+    Consumer -->|Persiste job antes do offset; deduplicação| DB
+    DB -->|SKIP LOCKED; lease e token de posse| Worker[Executores horizontais]
+    Worker -->|Deadline de 5s; chave idempotente| Risk[Mock de análise de risco]
+    Worker -->|Status + outbox; retry persistido| DB
+    Kafka -->|transactions.status.v1| Other[Outros sistemas]
+    Kafka -->|transactions.dlq.v1| DLQ[DLQ: falhas e quarentena]
+    CLI[CLI: inspeção e replay auditado] --> DB
+    API -.-> Logs[Logs JSON correlacionados]
+    Consumer -.-> Logs
+    Worker -.-> Logs

@@ -1,0 +1,90 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="1020" viewBox="0 0 1400 1020" role="img" aria-labelledby="title description">
+  <title id="title">BAMAQ Capital — arquitetura de processamento assíncrono</title>
+  <desc id="description">API e executores persistem alterações e eventos atomicamente no MySQL. O publicador entrega a outbox ao Kafka. O consumer persiste trabalhos antes de confirmar offsets. Executores usam leases e retries duráveis. Kafka também distribui mudanças de status e falhas.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0 0 L9 4.5 L0 9" fill="#516278"/></marker>
+    <style>
+      .box{fill:#fff;stroke:#9bafc3;stroke-width:2;rx:12}
+      .db{fill:#e8f3ff;stroke:#2871ae;stroke-width:2;rx:12}
+      .broker{fill:#e9f7ef;stroke:#278454;stroke-width:2;rx:12}
+      .failure{fill:#fff2e7;stroke:#ba6b27;stroke-width:2;rx:12}
+      .edge{fill:none;stroke:#516278;stroke-width:2;marker-end:url(#arrow)}
+      .name{font:600 20px Arial,sans-serif;fill:#19324b;text-anchor:middle}
+      .text{font:16px Arial,sans-serif;fill:#334e68;text-anchor:middle}
+      .label{font:15px Arial,sans-serif;fill:#334e68}
+    </style>
+  </defs>
+  <rect width="1400" height="1020" fill="#f5f8fc"/>
+  <text x="60" y="57" font-family="Arial,sans-serif" font-size="32" font-weight="700" fill="#19324b">BAMAQ Capital</text>
+  <text x="60" y="88" font-family="Arial,sans-serif" font-size="18" fill="#516278">Processamento assíncrono • efeitos locais idempotentes • recuperação persistente</text>
+
+  <rect class="box" x="60" y="140" width="250" height="90"/>
+  <text class="name" x="185" y="177">Cliente</text><text class="text" x="185" y="205">Criação e consulta</text>
+  <rect class="box" x="430" y="140" width="300" height="90"/>
+  <text class="name" x="580" y="177">API FastAPI</text><text class="text" x="580" y="205">POST / GET transactions</text>
+  <path class="edge" d="M310 185 H430"/>
+
+  <rect class="db" x="430" y="320" width="300" height="130"/>
+  <text class="name" x="580" y="351">MySQL 8.4</text>
+  <text class="text" x="580" y="380">transactions • outbox_events</text>
+  <text class="text" x="580" y="405">processing_jobs • failed_messages</text>
+  <text class="text" x="580" y="430">SQLAlchemy + Alembic</text>
+  <path class="edge" d="M580 230 V320"/>
+  <text class="label" x="595" y="266">Dados + evento</text><text class="label" x="595" y="288">no mesmo commit SQL</text>
+
+  <rect class="box" x="880" y="320" width="350" height="100"/>
+  <text class="name" x="1055" y="356">Publicador de outbox</text>
+  <text class="text" x="1055" y="384">Uma réplica • ordem por ID</text>
+  <text class="text" x="1055" y="406">Confirmação do broker antes de marcar</text>
+  <path class="edge" d="M730 370 H880"/>
+  <text class="label" x="750" y="349">Pendentes</text>
+
+  <rect class="broker" x="880" y="510" width="350" height="100"/>
+  <text class="name" x="1055" y="548">Kafka KRaft</text>
+  <text class="text" x="1055" y="577">Chave: transaction_id • 6 partições</text>
+  <text class="text" x="1055" y="599">commands.v1 • status.v1 • dlq.v1</text>
+  <path class="edge" d="M1055 420 V510"/>
+  <text class="label" x="1070" y="461">acks=all</text><text class="label" x="1070" y="483">Produtor idempotente</text>
+
+  <rect class="box" x="430" y="530" width="300" height="100"/>
+  <text class="name" x="580" y="565">Consumer Kafka</text>
+  <text class="text" x="580" y="593">Dedup por evento e geração</text>
+  <text class="text" x="580" y="617">Commit manual de offsets</text>
+  <path class="edge" d="M880 560 H730"/>
+  <text class="label" x="760" y="541">commands.v1</text>
+  <path class="edge" d="M530 530 V450"/>
+  <text class="label" x="270" y="485">Persistir job antes</text><text class="label" x="270" y="506">de confirmar offset</text>
+
+  <rect class="box" x="60" y="320" width="250" height="130"/>
+  <text class="name" x="185" y="354">Executores</text>
+  <text class="text" x="185" y="383">SKIP LOCKED • lease 30s</text>
+  <text class="text" x="185" y="408">Token impede escrita antiga</text>
+  <text class="text" x="185" y="433">Retries persistidos + jitter</text>
+  <path class="edge" d="M430 395 H310"/>
+  <text class="label" x="325" y="380">Jobs</text>
+  <path class="edge" d="M310 430 H375 V445 H430"/>
+  <text class="label" x="320" y="469">Status + outbox</text>
+
+  <rect class="box" x="60" y="550" width="250" height="90"/>
+  <text class="name" x="185" y="585">Serviço de risco</text><text class="text" x="185" y="613">Mock configurável</text>
+  <path class="edge" d="M185 450 V465 H40 V595 H60"/>
+  <text class="label" x="66" y="495">HTTP: deadline 5s</text><text class="label" x="66" y="517">Chave: transação + geração</text>
+
+  <rect class="box" x="780" y="710" width="260" height="90"/>
+  <text class="name" x="910" y="746">Outros sistemas</text><text class="text" x="910" y="775">Eventos de status</text>
+  <path class="edge" d="M960 610 V665 H910 V710"/>
+  <text class="label" x="800" y="659">status.v1</text>
+  <rect class="failure" x="1090" y="710" width="250" height="90"/>
+  <text class="name" x="1215" y="746">DLQ</text><text class="text" x="1215" y="775">Falhas e quarentena</text>
+  <path class="edge" d="M1150 610 V665 H1215 V710"/>
+  <text class="label" x="1228" y="666">dlq.v1</text>
+
+  <rect class="box" x="430" y="710" width="300" height="90"/>
+  <text class="name" x="580" y="746">CLI operacional</text><text class="text" x="580" y="775">Inspeção • replay auditado</text>
+  <path class="edge" d="M730 750 H755 V430 H730"/>
+
+  <rect x="60" y="855" width="1280" height="110" rx="12" fill="#e7edf5"/>
+  <text x="85" y="885" font-family="Arial,sans-serif" font-size="18" font-weight="600" fill="#19324b">Garantias e limites</text>
+  <text class="label" x="85" y="912">Outbox atômica • entrega pelo menos uma vez • deduplicação durável • retry após 30 min de indisponibilidade</text>
+  <text class="label" x="85" y="939">Logs JSON correlacionados • fonte Mermaid no repositório • um broker local; alta disponibilidade e benchmark como evolução</text>
+</svg>
