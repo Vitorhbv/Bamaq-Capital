@@ -33,7 +33,14 @@ services:
       - mysql-data:/var/lib/mysql
       - ./docker/mysql-init.sql:/docker-entrypoint-initdb.d/01-test-database.sql:ro
     healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h localhost -u root -p$$MYSQL_ROOT_PASSWORD --silent"]
+      # The entrypoint's temporary server accepts Unix sockets before TCP is ready.
+      # Validate the same authenticated TCP/database access used by migrations.
+      test:
+        - CMD-SHELL
+        - >-
+          MYSQL_PWD="$$MYSQL_PASSWORD" mysql --protocol=TCP --host=127.0.0.1
+          --user="$$MYSQL_USER" --database="$$MYSQL_DATABASE"
+          --connect-timeout=2 --execute="SELECT 1" --silent
       interval: 5s
       timeout: 3s
       retries: 30

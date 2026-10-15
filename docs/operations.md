@@ -111,6 +111,8 @@ Use a suíte automatizada para simular 30 minutos sem espera real. Ela também d
 
 O serviço `migrate` roda `alembic upgrade head` antes dos processos dependentes. Em desenvolvimento local, o mesmo comando usa `BAMAQ_DATABASE_URL`. Mudanças futuras devem criar revisões novas e preservar compatibilidade durante rollout; não alterar a migração inicial de um ambiente já entregue.
 
+O health check do MySQL executa `SELECT 1` via TCP, com o usuário e o banco da aplicação. Isso impede que o servidor temporário usado na inicialização de um volume novo seja considerado pronto: ele aceita conexões por socket Unix, mas ainda não atende as migrações via TCP.
+
 O script de criação de `bamaq_test` é executado apenas em volumes MySQL novos. Para um volume anterior sem esse banco, um administrador local pode executar o conteúdo de `docker/mysql-init.sql` no banco antes dos testes; não é necessário descartar os dados existentes.
 
 Kafka mantém eventos por sete dias no ambiente local. Jobs, outbox publicada e falhas permanecem no banco nesta versão. Antes de automatizar limpeza, definir a janela de auditoria/replay; manter deduplicação por pelo menos toda essa janela. Backups e recuperação do MySQL são essenciais porque trabalhos cujo offset já foi confirmado residem nele.
