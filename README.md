@@ -4,7 +4,7 @@ Aplicação para receber e analisar transações financeiras de forma assíncron
 
 ## Executar
 
-Pré-requisito: Docker com Compose. As portas locais 8000, 8001, 3306 e 9092 devem estar disponíveis. Execute os comandos na raiz deste repositório.
+Pré-requisito: Docker com Compose. As portas locais 8000, 8001, 8080, 3306 e 9092 devem estar disponíveis. Execute os comandos na raiz deste repositório.
 
 ```sh
 docker compose up -d --build
@@ -17,6 +17,7 @@ O Compose cria os bancos, aplica migrações Alembic e inicializa os três tópi
 - OpenAPI: [http://localhost:8000/openapi.json](http://localhost:8000/openapi.json).
 - Mock de risco: [http://localhost:8001/docs](http://localhost:8001/docs).
 - Prontidão da API: [http://localhost:8000/health/ready](http://localhost:8000/health/ready).
+- Administração web do MySQL (Adminer): [http://localhost:8080](http://localhost:8080).
 
 Verificação de ponta a ponta, com aprovação e rejeição reais pelo fluxo Kafka:
 
@@ -25,6 +26,33 @@ docker compose exec api python scripts/smoke.py
 ```
 
 Para encerrar preservando os dados: `docker compose down`. Os volumes MySQL e Kafka persistem entre execuções. As credenciais do Compose são exclusivas do ambiente local do desafio.
+
+## Administração web do MySQL
+
+O Compose inclui [Adminer](https://hub.docker.com/_/adminer), com versão fixada, disponível em [http://localhost:8080](http://localhost:8080). Para iniciar somente a interface e sua dependência MySQL:
+
+```sh
+docker compose up -d adminer
+```
+
+Na tela de login, informe:
+
+| Campo | Valor |
+|---|---|
+| Sistema | `MySQL` |
+| Servidor | `mysql` (preenchido automaticamente) |
+| Usuário | `bamaq` |
+| Senha | `bamaq` |
+| Banco de dados | `bamaq` |
+
+Depois de entrar, selecione `transactions` ou `outbox_events` e clique em **Selecionar dados** para visualizar e filtrar registros. A opção **Comando SQL** permite executar consultas, por exemplo:
+
+```sql
+SELECT * FROM transactions ORDER BY created_at DESC LIMIT 20;
+SELECT * FROM outbox_events WHERE published_at IS NULL ORDER BY id;
+```
+
+O Adminer está conectado ao banco real da aplicação e permite alterar dados conforme as permissões do usuário. A interface é publicada apenas em `127.0.0.1`, para uso local. O banco `bamaq_test` é exclusivo dos testes automatizados.
 
 ## API
 

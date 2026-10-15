@@ -38,6 +38,21 @@ services:
       timeout: 3s
       retries: 30
 
+  adminer:
+    image: adminer:6.1.2-standalone
+    restart: unless-stopped
+    environment:
+      ADMINER_DEFAULT_SERVER: mysql
+    ports: ["127.0.0.1:8080:8080"]
+    depends_on:
+      mysql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "php", "-r", "exit(@file_get_contents('http://127.0.0.1:8080/') === false ? 1 : 0);"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
   kafka:
     image: apache/kafka:4.1.2
     hostname: kafka

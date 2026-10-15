@@ -14,6 +14,8 @@ Logs são JSON, com componente, transação, evento, geração, tentativa, corre
 
 ## Consultas operacionais
 
+As tabelas também podem ser consultadas pelo navegador em [http://localhost:8080](http://localhost:8080), usando Adminer: sistema `MySQL`, servidor `mysql`, usuário/senha `bamaq` e banco `bamaq`. Selecione uma tabela para visualizar os dados ou use **Comando SQL** para executar as consultas abaixo. A interface fica disponível apenas no computador local.
+
 Abra o cliente MySQL do ambiente local:
 
 ```sh
