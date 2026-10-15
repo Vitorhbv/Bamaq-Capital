@@ -218,3 +218,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Local load-test reports (synthetic transaction IDs, timings and samples).
+reports/load-tests/
