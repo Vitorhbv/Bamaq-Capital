@@ -159,6 +159,32 @@ services:
       timeout: 5s
       retries: 5
 
+  load-test:
+    <<: *app
+    profiles: ["load"]
+    restart: "no"
+    entrypoint: ["python", "scripts/load_test.py"]
+    command: []
+    environment:
+      <<: *environment
+      BAMAQ_LOAD_BASE_URL: http://api:8000
+      BAMAQ_LOAD_DATABASE_URL: mysql+pymysql://bamaq:bamaq@mysql:3306/bamaq?charset=utf8mb4
+      BAMAQ_LOAD_KAFKA_BOOTSTRAP_SERVERS: kafka:9093
+      BAMAQ_LOAD_OUTPUT_DIR: /reports
+    volumes:
+      - ./reports/load-tests:/reports
+    depends_on:
+      api:
+        condition: service_healthy
+      relay:
+        condition: service_healthy
+      consumer:
+        condition: service_healthy
+      worker:
+        condition: service_healthy
+      risk-mock:
+        condition: service_healthy
+
   tests:
     <<: *app
     profiles: ["test"]

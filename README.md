@@ -162,6 +162,26 @@ A suíte cobre sucesso/rejeição, precisão decimal, validação, idempotência
 
 O workflow em `.github/workflows/ci.yaml` executa lint, testes com infraestrutura real, smoke test e verificação das migrações. [Registro de validação local](docs/validation.md).
 
+## Teste de carga local
+
+**Execução opcional:** o teste de carga é executado manualmente e não é necessário para iniciar ou utilizar a aplicação.
+
+O gerador oferece taxas progressivas de POSTs e verifica no MySQL a conclusão das transações, a drenagem da outbox e os resultados de negócio. Pelo Compose, também mede o atraso do grupo Kafka. Cada execução gera relatórios JSON/CSV em `reports/load-tests/load-UUID/`.
+
+```sh
+docker compose up -d --build --wait
+# Execução pequena: 150 transações, com taxas de 5 e 10 transações/segundo.
+docker compose --profile load run --rm load-test
+# Cenário progressivo até aproximadamente 10.000 transações recebidas/minuto.
+docker compose --profile load run --rm load-test --case
+```
+
+O cenário `--case` cria 25.290 transações e oferece até 167 POSTs/segundo por dois minutos. Isso representa cerca de 40.000 eventos Kafka/minuto no estágio final, pois cada transação sem retry produz quatro eventos. O teste pequeno é a execução padrão; o benchmark não roda automaticamente no CI.
+
+As transações sintéticas são gravadas no banco `bamaq` e permanecem identificadas pelo `customer_id` e pelo prefixo `Idempotency-Key` `load-UUID`. O teste não apaga dados. Um código de saída 0 significa que as verificações e os limites configurados passaram; 1 indica falhas verificadas; 2 indica erro de execução/configuração.
+
+Consulte [Teste de carga: comandos, métricas e interpretação](docs/load-testing.md) para configurar estágios, limites de latência, comparar réplicas e interpretar filas crescentes. Implementar o gerador não comprova capacidade de 10.000 eventos/minuto: essa conclusão depende do relatório de uma execução sustentada no ambiente medido.
+
 ## Configuração e processos
 
 As variáveis começam com `BAMAQ_`; veja [.env.example](.env.example). Copiar esse arquivo para `.env` é opcional. O Compose define endereços internos; URLs do exemplo são para execução no host.
@@ -185,4 +205,4 @@ O ambiente possui um broker e um MySQL, sem alta disponibilidade. O publicador �
 
 Os executores podem ser escalados com `docker compose up -d --scale worker=4`. Consumers podem ser escalados até o número de partições; são limitados pela ingestão, enquanto executores são limitados pela análise externa e pelo banco. Leases dependem de relógios sincronizados. A idempotência do mock reside em memória e se perde ao reiniciar; um serviço real com efeitos financeiros precisa de deduplicação durável própria.
 
-Logs JSON e health checks estão implementados. Métricas Prometheus, tracing, circuit breaker compartilhado, retenção automatizada de históricos e benchmark de 10.000 eventos/minuto são evoluções. Não há alegação de capacidade de produção sem medição.
+Logs JSON, health checks e um teste de carga local reproduzível estão implementados. Métricas Prometheus, tracing, circuit breaker compartilhado e retenção automatizada de históricos são evoluções. Não há alegação de capacidade de produção sem medição.
